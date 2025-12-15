@@ -151,9 +151,13 @@ void GPUTray::onTrayActivated(QSystemTrayIcon::ActivationReason reason)
             connect(m_popup, &TrayPopup::hybridRequested, this, &GPUTray::setHybrid);
             connect(m_popup, &TrayPopup::nvidiaRequested, this, &GPUTray::setNvidia);
             connect(m_popup, &TrayPopup::quitRequested, qApp, &QCoreApplication::quit);
+            connect(m_popup, &TrayPopup::refreshRequested, this, &GPUTray::updateStatus);
         }
 
-        m_popup->setStatusText(QString("Current GPU: %1").arg(currentModeFromEnvy()));
+        QString mode = currentModeFromEnvy();
+        m_popup->setStatusText(QString("Current GPU: %1").arg(mode));
+        m_popup->setModeIcon(iconForMode(mode));
+        m_popup->setMode(mode);
         QPoint pos = QCursor::pos();
         m_popup->showAt(pos);
     }
@@ -169,19 +173,25 @@ void GPUTray::setIntegrated()
 {
     runEnvyCommand("sudo envycontrol -s integrated");
     if (m_tray) m_tray->showMessage("GPU Switch", "Requested switch to Integrated. You may be asked for your password.");
+    if (m_popup) m_popup->setBusy(true);
     QTimer::singleShot(2000, this, &GPUTray::updateStatus);
+    QTimer::singleShot(2000, [this](){ if (m_popup) m_popup->setBusy(false); });
 }
 
 void GPUTray::setHybrid()
 {
     runEnvyCommand("sudo envycontrol -s hybrid --rtd3 2");
     if (m_tray) m_tray->showMessage("GPU Switch", "Requested switch to Hybrid. You may be asked for your password.");
+    if (m_popup) m_popup->setBusy(true);
     QTimer::singleShot(2000, this, &GPUTray::updateStatus);
+    QTimer::singleShot(2000, [this](){ if (m_popup) m_popup->setBusy(false); });
 }
 
 void GPUTray::setNvidia()
 {
     runEnvyCommand("sudo envycontrol -s nvidia");
     if (m_tray) m_tray->showMessage("GPU Switch", "Requested switch to Nvidia. You may be asked for your password.");
+    if (m_popup) m_popup->setBusy(true);
     QTimer::singleShot(2000, this, &GPUTray::updateStatus);
+    QTimer::singleShot(2000, [this](){ if (m_popup) m_popup->setBusy(false); });
 }

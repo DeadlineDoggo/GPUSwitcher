@@ -10,6 +10,14 @@
 #include <QPropertyAnimation>
 #include <QScreen>
 #include <QGuiApplication>
+#include <QToolButton>
+#include <QLineEdit>
+#include <QScrollArea>
+#include <QFrame>
+#include <QHBoxLayout>
+#include <QIcon>
+#include <QComboBox>
+#include <QProgressBar>
 
 TrayPopup::TrayPopup(QWidget *parent)
     : QWidget(parent, Qt::Tool | Qt::FramelessWindowHint | Qt::Popup)
@@ -36,29 +44,136 @@ TrayPopup::TrayPopup(QWidget *parent)
     setGraphicsEffect(shadow);
 
     QVBoxLayout *lay = new QVBoxLayout(this);
-    lay->setContentsMargins(12,12,12,12);
-    lay->setSpacing(8);
+    lay->setContentsMargins(0,0,0,0);
+    lay->setSpacing(0);
 
-    m_label = new QLabel("", this);
-    m_label->setStyleSheet("font-weight:600;");
-    lay->addWidget(m_label);
+    // Header bar
+    QWidget *header = new QWidget(this);
+    header->setObjectName("popupHeader");
+    header->setStyleSheet("#popupHeader { border-top-left-radius:10px; border-top-right-radius:10px; padding:10px 12px; }");
+    QHBoxLayout *hhead = new QHBoxLayout(header);
+    hhead->setContentsMargins(6,6,6,6);
+    hhead->setSpacing(8);
 
-    QPushButton *bInt = new QPushButton("Integrated", this);
-    connect(bInt, &QPushButton::clicked, this, &TrayPopup::integratedRequested);
-    lay->addWidget(bInt);
+    QPushButton *backBtn = new QPushButton(header);
+    backBtn->setFlat(true);
+    backBtn->setIcon(QIcon::fromTheme("go-previous"));
+    backBtn->setToolTip("Back");
+    backBtn->setFixedSize(28,28);
+    connect(backBtn, &QPushButton::clicked, this, &TrayPopup::hide);
+    hhead->addWidget(backBtn);
 
-    QPushButton *bHyb = new QPushButton("Hybrid", this);
-    connect(bHyb, &QPushButton::clicked, this, &TrayPopup::hybridRequested);
-    lay->addWidget(bHyb);
+    QLabel *title = new QLabel("GPU Switcher", header);
+    title->setStyleSheet("font-size:14px; font-weight:700;");
+    hhead->addWidget(title);
 
-    QPushButton *bNvd = new QPushButton("Nvidia", this);
-    connect(bNvd, &QPushButton::clicked, this, &TrayPopup::nvidiaRequested);
-    lay->addWidget(bNvd);
+    hhead->addStretch(1);
+    // QPushButton *cfg = new QPushButton(header);
+    // cfg->setFlat(true);
+    // cfg->setIcon(QIcon::fromTheme("settings"));
+    // cfg->setFixedSize(28,28);
+    // hhead->addWidget(cfg);
 
-    lay->addSpacing(6);
-    QPushButton *bQuit = new QPushButton("Quit", this);
-    connect(bQuit, &QPushButton::clicked, this, &TrayPopup::quitRequested);
-    lay->addWidget(bQuit);
+    lay->addWidget(header);
+
+    // Toolbar row (toggles / GPU quick actions)
+    // QWidget *toolbar = new QWidget(this);
+    // QHBoxLayout *ht = new QHBoxLayout(toolbar);
+    // ht->setContentsMargins(12,8,12,8);
+    // ht->setSpacing(8);
+
+    // QToolButton *bInt = new QToolButton(toolbar);
+    // bInt->setIcon(QIcon::fromTheme("chip"));
+    // bInt->setText("Integrated");
+    // bInt->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    // connect(bInt, &QToolButton::clicked, this, &TrayPopup::integratedRequested);
+    // ht->addWidget(bInt);
+
+    // QToolButton *bHyb = new QToolButton(toolbar);
+    // bHyb->setIcon(QIcon::fromTheme("computer"));
+    // bHyb->setText("Hybrid");
+    // bHyb->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    // connect(bHyb, &QToolButton::clicked, this, &TrayPopup::hybridRequested);
+    // ht->addWidget(bHyb);
+
+    // QToolButton *bNvd = new QToolButton(toolbar);
+    // bNvd->setIcon(QIcon::fromTheme("nvidia"));
+    // bNvd->setText("Nvidia");
+    // bNvd->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    // connect(bNvd, &QToolButton::clicked, this, &TrayPopup::nvidiaRequested);
+    // ht->addWidget(bNvd);
+
+    // ht->addStretch(1);
+    // lay->addWidget(toolbar);
+
+    // Status area: big icon, refresh button, dropdown
+    QWidget *statusArea = new QWidget(this);
+    QVBoxLayout *sa = new QVBoxLayout(statusArea);
+    sa->setContentsMargins(12,12,12,6);
+    sa->setSpacing(8);
+
+    m_iconLabel = new QLabel(statusArea);
+    m_iconLabel->setAlignment(Qt::AlignCenter);
+    m_iconLabel->setFixedSize(88,88);
+    sa->addWidget(m_iconLabel, 0, Qt::AlignHCenter);
+
+    QHBoxLayout *centerRow = new QHBoxLayout();
+    centerRow->setSpacing(8);
+    centerRow->setContentsMargins(0,0,0,0);
+
+    QToolButton *refresh = new QToolButton(statusArea);
+    refresh->setIcon(QIcon::fromTheme("view-refresh"));
+    refresh->setToolTip("Refresh status");
+    centerRow->addWidget(refresh, 0, Qt::AlignHCenter);
+
+    m_modeCombo = new QComboBox(statusArea);
+    m_modeCombo->addItems({"Integrated","Hybrid","Nvidia"});
+    centerRow->addWidget(m_modeCombo, 0, Qt::AlignHCenter);
+
+    sa->addLayout(centerRow);
+    lay->addWidget(statusArea);
+
+    // Separator
+    QFrame *sep = new QFrame(this);
+    sep->setFrameShape(QFrame::HLine);
+    sep->setFrameShadow(QFrame::Sunken);
+    lay->addWidget(sep);
+
+    // Scrollable content area
+    QScrollArea *scroll = new QScrollArea(this);
+    scroll->setFrameShape(QFrame::NoFrame);
+    scroll->setWidgetResizable(true);
+    QWidget *content = new QWidget(scroll);
+    QVBoxLayout *cv = new QVBoxLayout(content);
+    cv->setContentsMargins(12,12,12,12);
+    cv->setSpacing(12);
+
+    // Instead of network rows, show only small content area under status area
+    content->setLayout(cv);
+    // placeholder info row
+    QLabel *info = new QLabel("Manage GPU switching and status", content);
+    cv->addWidget(info);
+    cv->addStretch(1);
+
+    scroll->setWidget(content);
+    scroll->setFixedSize(360, 160);
+    lay->addWidget(scroll);
+
+    // Busy/progress indicator at bottom
+    m_progress = new QProgressBar(this);
+    m_progress->setMinimum(0);
+    m_progress->setMaximum(0); // indeterminate
+    m_progress->setVisible(false);
+    m_progress->setFixedHeight(10);
+    lay->addWidget(m_progress);
+
+    // Wire up controls
+    connect(refresh, &QToolButton::clicked, this, &TrayPopup::refreshRequested);
+    connect(m_modeCombo, QOverload<int>::of(&QComboBox::activated), this, [this](int index){
+        if (index == 0) emit integratedRequested();
+        else if (index == 1) emit hybridRequested();
+        else if (index == 2) emit nvidiaRequested();
+    });
 
     setLayout(lay);
 }
@@ -103,4 +218,26 @@ void TrayPopup::setStatusText(const QString &text)
 {
     if (m_label)
         m_label->setText(text);
+}
+
+void TrayPopup::setModeIcon(const QIcon &icon)
+{
+    if (!m_iconLabel) return;
+    QPixmap pm = icon.pixmap(72,72);
+    if (pm.isNull()) pm = icon.pixmap(48,48);
+    m_iconLabel->setPixmap(pm);
+}
+
+void TrayPopup::setMode(const QString &mode)
+{
+    if (!m_modeCombo) return;
+    if (mode == "integrated") m_modeCombo->setCurrentIndex(0);
+    else if (mode == "hybrid") m_modeCombo->setCurrentIndex(1);
+    else if (mode == "nvidia") m_modeCombo->setCurrentIndex(2);
+}
+
+void TrayPopup::setBusy(bool busy)
+{
+    if (!m_progress) return;
+    m_progress->setVisible(busy);
 }
