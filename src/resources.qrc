@@ -1,0 +1,8 @@
+<!DOCTYPE RCC>
+<RCC version="1.0">
+  <qresource prefix="/">
+    <file>icons/hybrid.png</file>
+    <file>icons/integrated.png</file>
+    <file>icons/nvidia.png</file>
+  </qresource>
+</RCC>
