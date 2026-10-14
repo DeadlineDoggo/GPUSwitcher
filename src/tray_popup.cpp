@@ -18,6 +18,14 @@
 #include <QIcon>
 #include <QComboBox>
 #include <QProgressBar>
+#include <QTextEdit>
+#include <QLineEdit>
+#include <QProcess>
+#include <QScrollBar>
+#include <QSocketNotifier>
+#include <QTextCursor>
+#include <unistd.h>
+#include <fcntl.h>
 
 TrayPopup::TrayPopup(QWidget *parent)
     : QWidget(parent, Qt::Tool | Qt::FramelessWindowHint | Qt::Popup)
@@ -148,15 +156,78 @@ TrayPopup::TrayPopup(QWidget *parent)
     cv->setContentsMargins(12,12,12,12);
     cv->setSpacing(12);
 
-    // Instead of network rows, show only small content area under status area
+    // Instead of network rows, provide an embedded console (scrollable) and input
     content->setLayout(cv);
-    // placeholder info row
-    QLabel *info = new QLabel("Manage GPU switching and status", content);
-    cv->addWidget(info);
-    cv->addStretch(1);
+
+    m_console = new QTextEdit(content);
+    m_console->setReadOnly(true);
+    m_console->setAcceptRichText(false);
+    m_console->setFixedHeight(140);
+    m_console->setStyleSheet("background: transparent; border: none;");
+    cv->addWidget(m_console);
+
+    m_consoleInput = new QLineEdit(content);
+    m_consoleInput->setPlaceholderText("Enter shell command and press Enter");
+    cv->addWidget(m_consoleInput);
+
+    // trim helper
+    auto trimConsole = [this](int maxLines){
+        if (!m_console) return;
+        QTextDocument *doc = m_console->document();
+        int lines = doc->blockCount();
+        if (lines <= maxLines) return;
+        // remove earliest blocks
+        QTextCursor cur(doc);
+        cur.movePosition(QTextCursor::Start);
+        for (int i = 0; i < lines - maxLines; ++i) {
+            cur.select(QTextCursor::LineUnderCursor);
+            cur.removeSelectedText();
+            cur.deleteChar();
+        }
+    };
+
+    // run entered command and append output
+    connect(m_consoleInput, &QLineEdit::returnPressed, this, [this, trimConsole]() {
+        QString cmd = m_consoleInput->text().trimmed();
+        if (cmd.isEmpty()) return;
+        if (m_console) {
+            m_console->append(QString("> %1").arg(cmd));
+            trimConsole(500);
+        }
+        QProcess *proc = new QProcess(this);
+        proc->start("bash", QStringList() << "-lc" << cmd);
+        connect(proc, &QProcess::readyReadStandardOutput, this, [this, proc, trimConsole]() {
+            QByteArray out = proc->readAllStandardOutput();
+            if (!out.isEmpty() && m_console) {
+                m_console->moveCursor(QTextCursor::End);
+                m_console->insertPlainText(QString::fromLocal8Bit(out));
+                m_console->verticalScrollBar()->setValue(m_console->verticalScrollBar()->maximum());
+                trimConsole(500);
+            }
+        });
+        connect(proc, &QProcess::readyReadStandardError, this, [this, proc, trimConsole]() {
+            QByteArray out = proc->readAllStandardError();
+            if (!out.isEmpty() && m_console) {
+                m_console->moveCursor(QTextCursor::End);
+                m_console->insertPlainText(QString::fromLocal8Bit(out));
+                m_console->verticalScrollBar()->setValue(m_console->verticalScrollBar()->maximum());
+                trimConsole(500);
+            }
+        });
+        connect(proc, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), this, [this, proc](int exitCode, QProcess::ExitStatus){
+            Q_UNUSED(exitCode);
+            Q_UNUSED(exitCode);
+            if (m_console) {
+                m_console->append(QString("[process finished]"));
+                m_console->verticalScrollBar()->setValue(m_console->verticalScrollBar()->maximum());
+            }
+            proc->deleteLater();
+        });
+        m_consoleInput->clear();
+    });
 
     scroll->setWidget(content);
-    scroll->setFixedSize(360, 160);
+    scroll->setFixedSize(360, 200);
     lay->addWidget(scroll);
 
     // Busy/progress indicator at bottom
@@ -174,6 +245,9 @@ TrayPopup::TrayPopup(QWidget *parent)
         else if (index == 1) emit hybridRequested();
         else if (index == 2) emit nvidiaRequested();
     });
+
+    // Start capturing stdout/stderr into the embedded console
+    startStdoutCapture();
 
     setLayout(lay);
 }
@@ -240,4 +314,67 @@ void TrayPopup::setBusy(bool busy)
 {
     if (!m_progress) return;
     m_progress->setVisible(busy);
+}
+
+void TrayPopup::trimConsole(int maxLines)
+{
+    if (!m_console) return;
+    QTextDocument *doc = m_console->document();
+    int lines = doc->blockCount();
+    if (lines <= maxLines) return;
+    QTextCursor cur(doc);
+    cur.movePosition(QTextCursor::Start);
+    for (int i = 0; i < lines - maxLines; ++i) {
+        cur.select(QTextCursor::LineUnderCursor);
+        cur.removeSelectedText();
+        cur.deleteChar();
+    }
+}
+
+void TrayPopup::handleStdout()
+{
+    if (m_stdoutFd < 0) return;
+    char buf[4096];
+    ssize_t n = 0;
+    // read available data
+    while ((n = ::read(m_stdoutFd, buf, sizeof(buf))) > 0) {
+        if (m_console) {
+            QString s = QString::fromLocal8Bit(buf, (int)n);
+            m_console->moveCursor(QTextCursor::End);
+            m_console->insertPlainText(s);
+            m_console->verticalScrollBar()->setValue(m_console->verticalScrollBar()->maximum());
+            trimConsole(500);
+        }
+    }
+}
+
+void TrayPopup::startStdoutCapture()
+{
+    if (m_stdoutFd >= 0) return; // already started
+
+    int pipefd[2];
+    if (::pipe(pipefd) == -1) {
+        return;
+    }
+
+    // make read non-blocking
+    int flags = fcntl(pipefd[0], F_GETFL, 0);
+    fcntl(pipefd[0], F_SETFL, flags | O_NONBLOCK);
+
+    // duplicate write end to stdout and stderr
+    ::fflush(stdout);
+    ::fflush(stderr);
+    if (::dup2(pipefd[1], STDOUT_FILENO) == -1) {
+        ::close(pipefd[0]); ::close(pipefd[1]); return;
+    }
+    if (::dup2(pipefd[1], STDERR_FILENO) == -1) {
+        ::close(pipefd[0]); ::close(pipefd[1]); return;
+    }
+
+    // close original write end
+    ::close(pipefd[1]);
+
+    m_stdoutFd = pipefd[0];
+    m_stdoutNotifier = new QSocketNotifier(m_stdoutFd, QSocketNotifier::Read, this);
+    connect(m_stdoutNotifier, &QSocketNotifier::activated, this, [this](int){ handleStdout(); });
 }
