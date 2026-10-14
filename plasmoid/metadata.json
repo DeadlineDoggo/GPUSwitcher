@@ -1,0 +1,21 @@
+{
+    "KPackageStructure": "Plasma/Applet",
+    "KPlugin": {
+        "Authors": [
+            {
+                "Email": "emanuelcisar@gmail.com",
+                "Name": "mrkuko"
+            }
+        ],
+        "Category": "System Information",
+        "Description": "Switch between Integrated, Hybrid and Nvidia GPU modes using EnvyControl",
+        "EnabledByDefault": true,
+        "Icon": "video-display",
+        "Id": "org.kde.plasma.gpuswitcher",
+        "License": "GPL-3.0+",
+        "Name": "GPU Switcher",
+        "Version": "1.0",
+        "Website": "https://github.com/mrkuko/GPUSwitcher"
+    },
+    "X-Plasma-API-Minimum-Version": "6.0"
+}
