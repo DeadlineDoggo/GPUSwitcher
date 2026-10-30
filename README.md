@@ -91,4 +91,17 @@ cmake --build build
 
 ## License
 
-GPL-3.0-or-later (as declared in `metadata.json`).
+The source code is licensed under the [MIT License](LICENSE). This does **not** cover the third-party logos listed below.
+
+## Credits & trademarks
+
+The mode icons ([plasmoid/contents/images/](plasmoid/contents/images), [src/icons/](src/icons)) are derived from third-party logos:
+
+| Icon | Source | License |
+|---|---|---|
+| NVIDIA logo (`nvidia.png`, and the NVIDIA part of `hybrid.png`) | [SVG Repo #331511](https://www.svgrepo.com/svg/331511/nvidia), collection "Colored Brand Icons", uploaded by SVG Repo | [CC0](https://creativecommons.org/publicdomain/zero/1.0/) (public domain dedication; attribution not required, given as a courtesy) |
+| Intel logo (`integrated.png`, and the Intel part of `hybrid.png`) | _TODO: add source link_ | _TODO_ |
+
+NVIDIA and the NVIDIA logo are trademarks of NVIDIA Corporation. Intel and the Intel logo are trademarks of Intel Corporation. They are used here only to identify the GPU mode they represent. This project is not affiliated with, endorsed by, or sponsored by NVIDIA or Intel.
+
+[EnvyControl](https://github.com/bayasdev/envycontrol) is a separate project by Victor Bayas and contributors; GPU Switcher is only a front end for it.

@@ -59,7 +59,8 @@ PlasmoidItem {
         connectedSources: []
 
         onNewData: (source, data) => {
-            const kind = source.split("#")[0]
+            const kind = pending[source] || ""
+            delete pending[source]
             const out = (data["stdout"] || "") + (data["stderr"] || "")
             const code = data["exit code"]
             disconnectSource(source)
@@ -77,10 +78,13 @@ PlasmoidItem {
             }
         }
 
-        // '#<counter>' makes every source name unique so repeated commands re-run.
+                // The source string IS the shell command, so uniqueness is added as a trailing comment.
         property int counter: 0
+        property var pending: ({})
         function exec(kind, cmd) {
-            connectSource(kind + "#" + (counter++) + "#" + "LC_ALL=C " + cmd)
+            const src = "LC_ALL=C " + cmd + " # " + (counter++)
+            pending[src] = kind
+            connectSource(src)
         }
     }
 
@@ -153,14 +157,5 @@ PlasmoidItem {
             Layout.margins: Kirigami.Units.smallSpacing
         }
 
-        Item { Layout.fillHeight: true }
-
-        PlasmaComponents3.Label {
-            text: i18n("A reboot is required after switching.")
-            opacity: 0.7
-            font: Kirigami.Theme.smallFont
-            Layout.fillWidth: true
-            Layout.margins: Kirigami.Units.smallSpacing
-        }
     }
 }

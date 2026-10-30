@@ -2,3 +2,4 @@ build/*
 NVIDIA_light_dark/*
 oldScript.sh
 *.plasmoid
+Sources/*
