@@ -14,12 +14,40 @@ PlasmoidItem {
     property bool busy: false
     property string message: ""
 
+    // GPU vendors found in /sys/class/drm (PCI vendor ids)
+    property bool hasIntel: false
+    property bool hasNvidia: false
+    property int amdCount: 0
+
+    // Integrated GPU vendor: "intel" | "amd" | "generic".
+    // With AMD integrated + AMD dedicated both present, integrated gets the generic icon.
+    readonly property string igpu: hasIntel ? "intel"
+        : (amdCount >= 2 ? "generic" : (amdCount === 1 ? "amd" : "intel"))
+    // Dedicated GPU vendor: "nvidia" | "amd" | "generic".
+    // EnvyControl hides the Nvidia card in integrated mode, so default to nvidia when nothing else is found.
+    readonly property string dgpu: hasNvidia ? "nvidia"
+        : ((hasIntel && amdCount >= 1) || amdCount >= 2 ? "amd" : "nvidia")
+
+    function img(name) { return Qt.resolvedUrl("../images/" + name + ".png") }
+
+    function iconFor(id) {
+        if (id === "integrated")
+            return img(igpu === "intel" ? "integrated" : "integrated-" + igpu)
+        if (id === "nvidia")
+            return img(dgpu === "nvidia" ? "nvidia" : "dedicated-" + dgpu)
+        if (id === "hybrid") {
+            if (igpu === "intel" && dgpu === "nvidia") return img("hybrid")
+            return img("hybrid-" + igpu + "-" + dgpu)
+        }
+        return ""
+    }
+
     readonly property var modes: [
-        { id: "integrated", label: i18n("Integrated"), icon: Qt.resolvedUrl("../images/integrated.png"),
+        { id: "integrated", label: i18n("Integrated"), icon: iconFor("integrated"),
           cmd: "envycontrol -s integrated" },
-        { id: "hybrid", label: i18n("Hybrid"), icon: Qt.resolvedUrl("../images/hybrid.png"),
+        { id: "hybrid", label: i18n("Hybrid"), icon: iconFor("hybrid"),
           cmd: "envycontrol -s hybrid --rtd3 2" },
-        { id: "nvidia", label: i18n("Nvidia"), icon: Qt.resolvedUrl("../images/nvidia.png"),
+        { id: "nvidia", label: i18n("Nvidia"), icon: iconFor("nvidia"),
           cmd: "envycontrol -s nvidia" }
     ]
 
@@ -42,6 +70,7 @@ PlasmoidItem {
 
     function refresh() {
         executable.exec("query", "envycontrol --query")
+        executable.exec("gpus", "cat /sys/class/drm/card?/device/vendor")
     }
 
     function switchTo(m) {
@@ -65,7 +94,12 @@ PlasmoidItem {
             const code = data["exit code"]
             disconnectSource(source)
 
-            if (kind === "query") {
+            if (kind === "gpus") {
+                const v = out.toLowerCase().split("\n").map(x => x.trim())
+                root.hasIntel = v.includes("0x8086")
+                root.hasNvidia = v.includes("0x10de")
+                root.amdCount = v.filter(x => x === "0x1002").length
+            } else if (kind === "query") {
                 if (code === 0) root.mode = root.parseQuery(out)
             } else if (kind.startsWith("switch:")) {
                 root.busy = false

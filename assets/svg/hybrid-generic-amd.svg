@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="55 9 275 213" width="275" height="213"><defs><clipPath id="l"><path d="M0 0H263.6L87.9 259H0z"/></clipPath><clipPath id="r"><path d="M263.6 0H351V259H87.9z"/></clipPath></defs>
+<g clip-path="url(#l)"><g transform="translate(0 -6)"><g fill="none" stroke="#8a8f98" stroke-width="14" stroke-linecap="round" stroke-linejoin="round">
+ <rect x="95" y="50" width="161" height="159" rx="18"/><rect x="140" y="95" width="71" height="69" rx="8" fill="#8a8f98" stroke="none"/>
+ <path d="M135 22v28M175 22v28M215 22v28M135 209v28M175 209v28M215 209v28M62 90h33M62 130h33M62 170h33M256 90h33M256 130h33M256 170h33"/></g></g></g><g clip-path="url(#r)"><g transform="translate(0 0)"><g fill="#ed1c24" fill-rule="evenodd"><path d="M262 40H328V108L306 86V62H262z"/>
+ <g transform="translate(0 22)"><path d="M30 200L72 100H100L142 200H114L108 184H64L58 200zM71 162H101L86 124z"/>
+ <path d="M150 200V100H176L196 142L216 100H242V200H220V140L204 176H188L172 140V200z"/>
+ <path d="M252 100H292Q330 100 330 150Q330 200 292 200H252zM274 120V180H290Q308 180 308 150Q308 120 290 120z"/></g></g></g></g></svg>
